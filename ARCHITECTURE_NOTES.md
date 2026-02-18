@@ -3,7 +3,7 @@
 ## Overview
 Roo Code is a VS Code extension that provides an AI-powered development environment with agent orchestration, code tools, and cloud integration.
 
-## Nervous System Map
+## Nervous System Mapping 
 
 1. **Activation**
    - Entry: `activate` in `src/extension.ts`.
