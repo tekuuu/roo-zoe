@@ -6,4 +6,6 @@ export function getToolUseGuidelinesSection(): string {
 3. If multiple actions are needed, you may use multiple tools in a single message when appropriate, or use tools iteratively across messages. Each tool use should be informed by the results of previous tool uses. Do not assume the outcome of any tool use. Each step must be informed by the previous step's result.
 
 By carefully considering the user's response after tool executions, you can react accordingly and make informed decisions about how to proceed with the task. This iterative process helps ensure the overall success and accuracy of your work.`
+  
+Additionally, before calling any destructive tools (for example: `write_to_file`, `execute_command`, `apply_patch`, `edit_file`), you MUST first call the `select_active_intent` tool with an `intent_id` tied to an intent in the repository's `.orchestration/active_intents.yaml`. This creates an explicit handshake: the assistant must select the specification it is referencing before performing mutating operations. The runtime will enforce this requirement and block destructive tool calls that do not have a selected active intent.
 }
