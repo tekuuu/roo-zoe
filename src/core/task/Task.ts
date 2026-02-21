@@ -178,6 +178,12 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	readonly workspacePath: string
 
 	/**
+	 * Active intent id selected by `select_active_intent` tool. Hooks and post-processing
+	 * can use this to associate tool executions with user-provided intent specifications.
+	 */
+	activeIntentId?: string
+
+	/**
 	 * The mode associated with this task. Persisted across sessions
 	 * to maintain user context when reopening tasks from history.
 	 *

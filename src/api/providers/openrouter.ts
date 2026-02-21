@@ -12,6 +12,9 @@ import {
 	DEEP_SEEK_DEFAULT_TEMPERATURE,
 } from "@roo-code/types"
 import { TelemetryService } from "@roo-code/telemetry"
+import * as os from "os"
+import * as fs from "fs/promises"
+import * as path from "path"
 
 import { NativeToolCallParser } from "../../core/assistant-message/NativeToolCallParser"
 
@@ -139,6 +142,50 @@ interface CompletionUsage {
 }
 
 export class OpenRouterHandler extends BaseProvider implements SingleCompletionHandler {
+	/**
+	 * Helper that inspects a system prompt for bare references to `active_intents`.
+	 * If it looks like the prompt may cause provider errors, it appends a safe
+	 * YAML fallback block and emits telemetry/logs.  Returns an object containing
+	 * the (possibly rewritten) prompt and a flag indicating whether injection
+	 * occurred.
+	 */
+	public static async sanitizeSystemPrompt(
+		prompt: string,
+		modelId?: string,
+	): Promise<{ systemPrompt: string; injected: boolean }> {
+		let systemPrompt = prompt
+		let injected = false
+		try {
+			const hasActiveIntentsYaml = /active_intents\s*:\s*\[|active_intents\s*:/m.test(systemPrompt)
+			const referencesBareActiveIntents =
+				/active_intents is not defined/.test(systemPrompt) ||
+				(/\bactive_intents\b/.test(systemPrompt) && !hasActiveIntentsYaml)
+			if (referencesBareActiveIntents) {
+				injected = true
+				const excerpt = systemPrompt.slice(-8000)
+				console.warn(
+					"[OpenRouterHandler] Injecting fallback active_intents into system prompt to avoid provider failure",
+				)
+				try {
+					const tmpPath = path.join(os.tmpdir(), `roo_prompt_debug_openrouter_${Date.now()}.txt`)
+					await fs.writeFile(tmpPath, excerpt, "utf-8")
+					TelemetryService.instance.captureEvent("PROMPT_SANITY_CHECK" as any, {
+						message: "Injected fallback active_intents into system prompt",
+						excerpt_file: tmpPath,
+						model: modelId,
+					})
+					console.warn(`[OpenRouterHandler] Wrote prompt excerpt to ${tmpPath}`)
+				} catch (e) {
+					console.error("[OpenRouterHandler] Failed to write prompt excerpt to temp file", e)
+				}
+				// append fallback
+				systemPrompt = `${systemPrompt}\n\n# Active Intents (injected fallback)\nactive_intents: []`
+			}
+		} catch (e) {
+			console.error("[OpenRouterHandler] Error during prompt sanity check", e)
+		}
+		return { systemPrompt, injected }
+	}
 	protected options: ApiHandlerOptions
 	private client: OpenAI
 	protected models: ModelRecord = {}
@@ -212,6 +259,9 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 		metadata?: ApiHandlerCreateMessageMetadata,
 	): AsyncGenerator<ApiStreamChunk> {
 		const model = await this.fetchModel()
+
+		// run the shared sanitation logic, which may modify the systemPrompt
+		;({ systemPrompt } = await OpenRouterHandler.sanitizeSystemPrompt(systemPrompt, model.id))
 
 		let { id: modelId, maxTokens, temperature, topP, reasoning } = model
 

@@ -30,6 +30,7 @@ import { askFollowupQuestionTool } from "../tools/AskFollowupQuestionTool"
 import { switchModeTool } from "../tools/SwitchModeTool"
 import { attemptCompletionTool, AttemptCompletionCallbacks } from "../tools/AttemptCompletionTool"
 import { newTaskTool } from "../tools/NewTaskTool"
+import { selectActiveIntentTool } from "../tools/SelectActiveIntentTool"
 import { updateTodoListTool } from "../tools/UpdateTodoListTool"
 import { runSlashCommandTool } from "../tools/RunSlashCommandTool"
 import { skillTool } from "../tools/SkillTool"
@@ -39,6 +40,7 @@ import { isValidToolName, validateToolUse } from "../tools/validateToolUse"
 import { codebaseSearchTool } from "../tools/CodebaseSearchTool"
 
 import { formatResponse } from "../prompts/responses"
+import { applyPreHooks, applyPostHooks } from "../../hooks/prePostHook"
 import { sanitizeToolUseId } from "../../utils/tool-id"
 
 /**
@@ -675,7 +677,32 @@ export async function presentAssistantMessage(cline: Task) {
 				}
 			}
 
+			// Run pre-hooks to allow intent-checks and context injection before executing the tool.
+			try {
+				const pre = await applyPreHooks(block, { cwd: cline.cwd, intentId: (cline as any).activeIntentId })
+				if (!pre.allowed) {
+					// Push a tool_result indicating the hooks blocked execution.
+					cline.pushToolResultToUserContent({
+						type: "tool_result",
+						tool_use_id: sanitizeToolUseId(toolCallId),
+						content: formatResponse.toolError(pre.error),
+						is_error: true,
+					})
+					break
+				}
+			} catch (err) {
+				console.warn("applyPreHooks error", err)
+			}
+
 			switch (block.name) {
+				case "select_active_intent":
+					await selectActiveIntentTool.handle(cline, block as ToolUse<"select_active_intent">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+
 				case "write_to_file":
 					await checkpointSaveAndMark(cline)
 					await writeToFileTool.handle(cline, block as ToolUse<"write_to_file">, {

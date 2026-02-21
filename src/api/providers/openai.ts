@@ -1,6 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import OpenAI, { AzureOpenAI } from "openai"
 import axios from "axios"
+import { TelemetryService } from "@roo-code/telemetry"
 
 import {
 	type ModelInfo,
@@ -84,6 +85,28 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 		messages: Anthropic.Messages.MessageParam[],
 		metadata?: ApiHandlerCreateMessageMetadata,
 	): ApiStream {
+		// Defensive prompt sanity check: inject fallback `active_intents` if prompt
+		// references it without providing a YAML block. Log excerpt to telemetry.
+		try {
+			const hasActiveIntentsYaml = /active_intents\s*:\s*\[|active_intents\s*:/m.test(systemPrompt)
+			const referencesBareActiveIntents =
+				/active_intents is not defined/.test(systemPrompt) ||
+				(/\bactive_intents\b/.test(systemPrompt) && !hasActiveIntentsYaml)
+			if (referencesBareActiveIntents) {
+				const excerpt = systemPrompt.slice(-2000)
+				console.warn(
+					"[OpenAiHandler] Injecting fallback active_intents into system prompt to avoid provider failure",
+				)
+				TelemetryService.instance.captureEvent("PROMPT_SANITY_CHECK" as any, {
+					message: "Injected fallback active_intents into system prompt",
+					excerpt: excerpt,
+					model: this.options.openAiModelId ?? "unknown",
+				})
+				systemPrompt = `${systemPrompt}\n\n# Active Intents (injected fallback)\nactive_intents: []`
+			}
+		} catch (e) {
+			console.error("[OpenAiHandler] Error during prompt sanity check", e)
+		}
 		const { info: modelInfo, reasoning } = this.getModel()
 		const modelUrl = this.options.openAiBaseUrl ?? ""
 		const modelId = this.options.openAiModelId ?? ""

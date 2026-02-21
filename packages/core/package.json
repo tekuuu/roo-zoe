@@ -20,7 +20,8 @@
 		"execa": "^9.5.2",
 		"ignore": "^7.0.3",
 		"openai": "^5.12.2",
-		"zod": "^3.25.61"
+		"zod": "^3.25.61",
+		"js-yaml": "^4.1.0"
 	},
 	"devDependencies": {
 		"@roo-code/config-eslint": "workspace:^",
