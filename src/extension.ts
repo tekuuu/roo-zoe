@@ -35,6 +35,8 @@ import { TerminalRegistry } from "./integrations/terminal/TerminalRegistry"
 import { openAiCodexOAuthManager } from "./integrations/openai-codex/oauth"
 import { McpServerManager } from "./services/mcp/McpServerManager"
 import { CodeIndexManager } from "./services/code-index/manager"
+import { IntentService } from "./hooks/intent/IntentService"
+import { TraceService } from "./hooks/trace/TraceService"
 import { MdmService } from "./services/mdm/MdmService"
 import { migrateSettings } from "./utils/migrateSettings"
 import { autoImportSettings } from "./utils/autoImportSettings"
@@ -188,6 +190,34 @@ export async function activate(context: vscode.ExtensionContext) {
 				})
 
 				context.subscriptions.push(manager)
+			}
+		}
+	}
+
+	// Ensure IntentService is initialized for each workspace to create .orchestration files
+	// before composing system prompts or running hooks. Run in background and log errors.
+	if (vscode.workspace.workspaceFolders) {
+		for (const folder of vscode.workspace.workspaceFolders) {
+			try {
+				const intentService = IntentService.getInstance(folder.uri.fsPath)
+				void intentService.initialize().catch((err) => {
+					outputChannel.appendLine(
+						`[IntentService] Initialization failed for ${folder.uri.fsPath}: ${err instanceof Error ? err.message : String(err)}`,
+					)
+				})
+			} catch (err) {
+				outputChannel.appendLine(
+					`[IntentService] getInstance error for ${folder.uri.fsPath}: ${err instanceof Error ? err.message : String(err)}`,
+				)
+			}
+
+			// ensure trace service singleton exists for workspace path
+			try {
+				TraceService.getInstance(folder.uri.fsPath)
+			} catch (err) {
+				outputChannel.appendLine(
+					`[TraceService] getInstance error for ${folder.uri.fsPath}: ${err instanceof Error ? err.message : String(err)}`,
+				)
 			}
 		}
 	}

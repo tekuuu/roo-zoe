@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+
+// quick script to exercise OpenRouterHandler and trigger prompt guard
+const { OpenRouterHandler } = require("../src/api/providers/openrouter")
+
+async function main() {
+	const handler = new OpenRouterHandler({
+		openRouterApiKey: "test",
+		openRouterModelId: "test-model",
+	})
+
+	const systemPrompt = `This prompt refers to active_intents but no YAML.`
+	const messages = []
+
+	console.log("calling createMessage...")
+	const gen = handler.createMessage(systemPrompt, messages, {})
+	for await (const chunk of gen) {
+		if (chunk.type === "text") {
+			process.stdout.write(chunk.text)
+		}
+	}
+	console.log("\ncompleted")
+}
+
+main().catch((e) => {
+	console.error("error in script", e)
+})

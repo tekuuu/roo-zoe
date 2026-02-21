@@ -3,6 +3,7 @@ import type { ClineAskUseMcpServer, McpExecutionStatus } from "@roo-code/types"
 import { Task } from "../task/Task"
 import { formatResponse } from "../prompts/responses"
 import { t } from "../../i18n"
+import { hookManager } from "../../hooks/HookManager"
 import type { ToolUse } from "../../shared/tools"
 import { toolNamesMatch } from "../../utils/mcp-name"
 
@@ -308,7 +309,9 @@ export class UseMcpToolTool extends BaseTool<"use_mcp_tool"> {
 			toolName,
 		})
 
-		const toolResult = await task.providerRef.deref()?.getMcpHub()?.callTool(serverName, toolName, parsedArguments)
+		const toolResult = await hookManager.executeToolWithHooks(toolName, parsedArguments, () =>
+			task.providerRef.deref()?.getMcpHub()?.callTool(serverName, toolName, parsedArguments),
+		)
 
 		let toolResultPretty = "(No response)"
 		let images: string[] = []

@@ -107,6 +107,24 @@ describe("OpenRouterHandler", () => {
 		})
 	})
 
+	// simple unit tests for the active_intents sanitation helper
+	describe("sanitizeSystemPrompt helper", () => {
+		it("does nothing when prompt already contains YAML block", async () => {
+			const prompt = "foo\nactive_intents: []\nbar"
+			const { systemPrompt, injected } = await OpenRouterHandler.sanitizeSystemPrompt(prompt, "test")
+			expect(injected).toBe(false)
+			expect(systemPrompt).toBe(prompt)
+		})
+
+		it("injects fallback when bare reference detected", async () => {
+			const prompt = "please use active_intents is not defined in your response"
+			const { systemPrompt, injected } = await OpenRouterHandler.sanitizeSystemPrompt(prompt, "test")
+			expect(injected).toBe(true)
+			expect(systemPrompt).toContain("active_intents: []")
+			expect(systemPrompt.startsWith(prompt)).toBe(true)
+		})
+	})
+
 	describe("fetchModel", () => {
 		it("returns correct model info when options are provided", async () => {
 			const handler = new OpenRouterHandler(mockOptions)

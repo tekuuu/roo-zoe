@@ -68,6 +68,12 @@ describe("getRulesSection", () => {
 		expect(result).toContain(cwd)
 	})
 
+	it("includes intent-first workflow instructions", () => {
+		const result = getRulesSection(cwd)
+		expect(result).toContain("Intent-First Workflow")
+		expect(result).toContain("select_active_intent")
+	})
+
 	it("includes vendor confidentiality section when isStealthModel is true", () => {
 		const settings = {
 			todoListEnabled: true,

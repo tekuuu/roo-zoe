@@ -1,4 +1,6 @@
 import * as vscode from "vscode"
+import * as fs from "fs/promises"
+import * as path from "path"
 
 import { type ModeConfig, type PromptComponent, type CustomModePrompts, type TodoItem } from "@roo-code/types"
 
@@ -106,7 +108,14 @@ ${await addCustomInstructions(baseInstructions, globalCustomInstructions || "", 
 	settings,
 })}`
 
-	return basePrompt
+	// Defensive: include active_intents YAML inline so providers never see an undefined variable
+	try {
+		const intentsPath = path.join(cwd, ".orchestration", "active_intents.yaml")
+		const intentsContent = await fs.readFile(intentsPath, "utf-8")
+		return `${basePrompt}\n\n# Active Intents (from .orchestration/active_intents.yaml)\n${intentsContent}`
+	} catch {
+		return `${basePrompt}\n\n# Active Intents (none)\nactive_intents: []`
+	}
 }
 
 export const SYSTEM_PROMPT = async (
